@@ -78,7 +78,8 @@ Function New-Inventory {
 				[void]$Powershell.AddScript({
 					Param (
 						[System.String]$PC,
-						[System.Management.Automation.CredentialAttribute()]$Cred
+						[System.Management.Automation.CredentialAttribute()]$Cred,
+						[System.String]$MaxRemoteThreads 
 					)
 					TRY {
 						# Trying to connect to individual PC. If PC fails, will immediatly move on. 
@@ -269,7 +270,8 @@ Function New-Inventory {
 				})
 				$Hash = @{
 					PC = $_
-					Cred = $Credentials 
+					Cred = $Credentials
+					MaxRemoteThreads = $MaxRemoteThreads
 				}
 				[void]$Powershell.AddParameters($Hash)
 				$Handle = $Powershell.BeginInvoke() 
