@@ -63,7 +63,7 @@ Function New-Inventory {
 		# Creating pool for threads and then creating a container for threads.	
 		$RunspacePool = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspacePool(1, $MaxLocalThreads)
 		$RunspacePool.Open()
-		$ThreadContainer = [System.Collections.ArrayList]::New()
+		$Threads = [System.Collections.ArrayList]::New()
 	}
 
 	PROCESS {
