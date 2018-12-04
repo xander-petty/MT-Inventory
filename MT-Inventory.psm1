@@ -73,8 +73,6 @@ Function New-Inventory {
 				# Creating powershell session for each thread and assigning it to the pool.
 				$Powershell = [powershell]::Create()
 				$Powershell.RunspacePool = $RunspacePool
-				$Threads = [System.Collections.ArrayList]::New() 
-				$Data = [System.Collections.ArrayList]::New() # Maybe get rid of this. Try just pushing directly to CSV instead of keeping in RAM
 				[void]$Powershell.AddScript({
 					Param (
 						[System.String]$PC,
@@ -287,23 +285,24 @@ Function New-Inventory {
 			}
 		} CATCH {
 			Write-Verbose -Message "Could not spin up threads." 
-		} FINALLY {
-			DO {
-				$Threads | Foreach {
-					IF ($_.Handle.IsCompleted -eq $True) {
-						$PSID = $_.Powershell.InstanceID.Guid 
-						$Line = $_.Powershell.EndInvoke($_.Handle)
-						[void]$Data.Add($Line)
-						$Line | Export-Csv -Path $CsvPath -Append -Force
-						$_.Powershell.Dispose() 
-						$Threads = $Threads | Where-Object {$_.Powershell.InstanceID.Guid -ne $PSID} 
-					}
-				}
-			} until ($Threads -eq $Null) 
-		}
+		} 
 	}
 
 	END {
+		$Data = [System.Collections.ArrayList]::New()
+		DO {
+			$Threads | Foreach {
+				IF ($_.Handle.IsCompleted -eq $True) {
+					$PSID = $_.Powershell.InstanceID.Guid
+					$Line = $_.Powershell.EndInvoke($_.Handle)
+					$Line | Export-Csv -Path $CsvPath -Append -Force
+					[void]$Data.Add($Line)
+					$_.Powershell.Dispose()
+					$Threads = $Threads | Where-Object {$_.Powershell.InstanceID.Guid -ne $PSID}
+				}
+			}
+		} until ($Threads -eq $Null) 
+
 		$RunspacePool.Close()
 		$RunspacePool.Dispose() 
 		Write-Output $Data 
