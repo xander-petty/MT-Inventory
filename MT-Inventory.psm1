@@ -56,10 +56,20 @@ Function New-Inventory {
 			Mandatory = $True,
 			HelpMessage = "Please enter the destination for the CSV File"
 		)]
-		[System.String]$CsvPath 
+		[System.String]$CsvPath,
+		
+		[Parameter (
+			Mandatory = $False,
+			HelpMessage = "Please enter True or False"
+		)]
+		[bool]$StopWatch = $False
 	)
 
 	BEGIN {
+		IF ($StopWatch -eq $True) {
+			$Clock = [System.Diagnostics.StopWatch]::New()
+			$Clock.Start() 
+		}
 		# Creating pool for threads and then creating a container for threads.	
 		$RunspacePool = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspacePool(1, $MaxLocalThreads)
 		$RunspacePool.Open()
@@ -215,6 +225,24 @@ Function New-Inventory {
 							$T7.Tag = 'Storage'
 							[void]$ThreadContainer.Add($T7)
 
+							# Pulling list of User accounts 
+							$PS8 = [powershell]::Create()
+							$PS8.RunspacePool = $RSPool
+							[void]$PS8.AddScript({
+								$Users = Get-ChildItem -Path C:\Users -Force | Where-Object {$_.Name -notlike "All*"} | Where-Object {$_.Name -notlike "Default*"} | Where-Object {$_.Name -notlike "*Public*"} | Where-Object {$_.Name -notlike "desktop.ini"}
+								Write-Output $Users 
+							})
+							$H8 = $PS8.BeginInvoke()
+							$T8 = [System.String]::Empty
+							$T8 | Add-Member -MemberType NoteProperty -Name Powershell -Value $Null
+							$T8 | Add-Member -MemberType NoteProperty -Name Handle -Value $Null
+							$T8 | Add-Member -MemberType NoteProperty -Name Tag -Value $Null
+							$T8 = $T8 | Select-Object -Property Powershell, Handle, Tag 
+							$T8.Powershell = $PS8
+							$T8.Handle = $H8 
+							$T8.Tag = 'Users'
+							[void]$ThreadContainer.Add($T8)
+
 							DO {
 								$ThreadContainer | Foreach {
 									IF ($_.Handle.IsCompleted -eq $True) {
@@ -233,7 +261,9 @@ Function New-Inventory {
 											$CPU = $_.Powershell.EndInvoke($_.Handle) 
 										} ELSEIF ($_.Tag -eq 'Storage') {
 											$Storage = $_.Powershell.EndInvoke($_.Handle) 
-										} 
+										} ELSEIF ($_.Tag -eq 'Users') {
+											$Users = $_.Powershell.EndInvoke($_.Handle)
+										}
 										$ThreadContainer = $ThreadContainer | Where-Object {$_.Powershell.InstanceID.Guid -ne $PSID} 
 										$_.Powershell.Dispose() 
 									}
@@ -257,6 +287,8 @@ Function New-Inventory {
 								Software = $Software.Name 
 								TotalStorage = $Storage.Capacity / 1GB
 								AvailableStorage = $Storage.FreeSpace / 1GB 
+								UserProfiles = $Users
+								TotalProfiles = $Users.Count
 							}
 							$Object = New-Object -TypeName psobject -Property $Hash 
 							Write-Output $Object 
@@ -306,5 +338,9 @@ Function New-Inventory {
 		$RunspacePool.Close()
 		$RunspacePool.Dispose() 
 		Write-Output $Data 
+		IF ($StopWatch -eq $True) {
+			$Clock.Stop()
+			Write-Output $Clock.Elapsed
+		}
 	}
 }
