@@ -78,8 +78,12 @@ Function New-Inventory {
 
 	PROCESS {
 		TRY {
+			$Total = $ComputerNames.Count 
+			$Count = 0 
 			Write-Debug -Message "Attempting to add instructions to threads."
 			$ComputerNames | Foreach {
+				$Count += 1
+				Write-Progress -Activity "Spinning up multi-threading" -Status "Creating Threads" -CurrentOperation "Adding $_ to thread pool" -PercentComplete $(($Count / $Total) * 100) 
 				# Creating powershell session for each thread and assigning it to the pool.
 				$Powershell = [powershell]::Create()
 				$Powershell.RunspacePool = $RunspacePool
@@ -322,25 +326,32 @@ Function New-Inventory {
 
 	END {
 		$Data = [System.Collections.ArrayList]::New()
+		$Total = $Threads.Count 
+		$Count = 0 
+		$LastPC = "None" 
 		DO {
+			Write-Progress -Activity "Waiting for threads to complete" -Status "Remaining PCs: $($Threads | Foreach {Write-Output $_.ComputerName})" -PercentComplete $(($Count / $Total) * 100) -CurrentOperation "Checking Threads | Last PC Completed: $($LastPC)"
 			$Threads | Foreach {
 				IF ($_.Handle.IsCompleted -eq $True) {
+					$LastPC = $_.ComputerName 
+					Write-Progress -Activity "Waiting for threads to complete" -Status "Running" -PercentComplete $(($Count / $Total) * 100) -CurrentOperation "Closing thread from $_.ComputerName and writing data"   
+					$Count += 1
 					$PSID = $_.Powershell.InstanceID.Guid
 					$Line = $_.Powershell.EndInvoke($_.Handle)
 					$Line | Export-Csv -Path $CsvPath -Append -Force
 					[void]$Data.Add($Line)
 					$_.Powershell.Dispose()
-					$Threads = $Threads | Where-Object {$_.Powershell.InstanceID.Guid -ne $PSID}
+					$Threads = $Threads | Where-Object {$_.Powershell.InstanceID.Guid -ne $PSID}  
 				}
 			}
-		} until ($Threads -eq $Null) 
-
+		} until ($Threads -eq $null) 
+		Write-Progress -Activity "Closing thread pool" -Status "Ending" -PercentComplete $(($Count / $Total) * 100) -CurrentOperation "Closing pool"  
 		$RunspacePool.Close()
-		$RunspacePool.Dispose() 
+		$RunspacePool.Dispose()
 		Write-Output $Data 
 		IF ($StopWatch -eq $True) {
 			$Clock.Stop()
-			Write-Output $Clock.Elapsed
+			Write-Output $Clock.Elapsed 
 		}
 	}
 }
