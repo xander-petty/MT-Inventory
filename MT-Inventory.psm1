@@ -45,12 +45,12 @@ Function New-Inventory {
 		[Parameter (
 			Mandatory = $False
 		)]
-		[System.String]$MaxLocalThreads = 1,
+		[int]$MaxLocalThreads = 1,
 
 		[Parameter (
 			Mandatory = $False
 		)]
-		[System.String]$MaxRemoteThreads = 1,
+		[int]$MaxRemoteThreads = 1,
 
 		[Parameter (
 			Mandatory = $True,
@@ -87,7 +87,7 @@ Function New-Inventory {
 					Param (
 						[System.String]$PC,
 						[System.Management.Automation.CredentialAttribute()]$Cred,
-						[System.String]$MaxRemoteThreads 
+						[int]$MaxRemoteThreads 
 					)
 					TRY {
 						# Trying to connect to individual PC. If PC fails, will immediatly move on. 
